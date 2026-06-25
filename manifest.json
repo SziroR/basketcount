@@ -1,0 +1,9 @@
+{
+  "name": "TukerKozgaz awesome RSVP",
+  "short_name": "Kozgazapp",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#f97316",
+  "orientation": "portrait"
+}
