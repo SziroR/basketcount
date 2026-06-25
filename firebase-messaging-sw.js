@@ -23,7 +23,7 @@ messaging.onBackgroundMessage((payload) => {
     body: payload.notification.body,
     icon: '/icon.png', // path to your app icon
     badge: '/icon.png',
-    data: { url: 'https://https://sziror.github.io/basketcount/' } 
+    data: { url: 'https://sziror.github.io/basketcount/' } 
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

@@ -1,0 +1,141 @@
+// This is the script used for the google sheet backend
+// --- CONFIGURATION ---
+var SECRET_KEY = "talicskauborka"; 
+
+// RSVP POST PAYLOAD HANDLER
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  if (!data.key || data.key !== SECRET_KEY) {
+    return ContentService.createTextOutput("Unauthorized");
+  }
+  
+  var rsvpSheet = ss.getSheetByName("RSVPs"); 
+  
+  // Column A: Date | Column B: Event | Column C: Name | Column D: Status
+  rsvpSheet.appendRow([
+    new Date(), 
+    data.event, 
+    data.name, 
+    data.status
+  ]);
+
+  return ContentService.createTextOutput("RSVP Success");
+}
+
+function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var eventSheet = ss.getSheetByName("Events");
+  var data = eventSheet.getDataRange().getValues();
+  
+  var activeEvent = null;
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][5] === "invite sent") { 
+      activeEvent = {
+        id: data[i][0],
+        title: data[i][1],
+        time: data[i][2],
+        location: data[i][3],
+        mapsLink: data[i][4]
+      };
+      break; 
+    }
+  }
+  
+  if (!activeEvent) {
+    activeEvent = { title: "No Active Invites", time: "", location: "", mapsLink: "" };
+  }
+  
+  return ContentService.createTextOutput(JSON.stringify(activeEvent))
+                        .setMimeType(ContentService.MimeType.JSON);
+}
+
+// AUTOMATION STATE MACHINE + MODERN HTTP v1 PUSH BROADCASTER
+function onEdit(e) {
+  var range = e.range;
+  var sheet = range.getSheet();
+  
+  if (sheet.getName() === "Events" && range.getColumn() === 6) {
+    var editedRow = range.getRow();
+    var statusValue = range.getValue();
+    if (editedRow === 1) return; 
+    
+    var timestampCell = sheet.getRange(editedRow, 7); 
+    var countTrackingCell = sheet.getRange(editedRow, 8); 
+    var formattedDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
+    
+    if (statusValue === "announce it now") {
+      var allData = sheet.getDataRange().getValues();
+      var activeInviteCount = 0;
+      
+      for (var i = 1; i < allData.length; i++) {
+        if (allData[i][5] === "invite sent") activeInviteCount++;
+      }
+      
+      if (activeInviteCount > 0) {
+        range.setValue("error in invite sending").setFontColor("red");
+        timestampCell.setValue("⚠️ Failed at " + formattedDate + " - Close out active 'invite sent' event first!").setFontColor("red").setFontWeight("bold");
+        countTrackingCell.setValue(0);
+      } else {
+        range.setValue("invite sent").setFontColor("green");
+        timestampCell.setValue("Sent on: " + formattedDate).setFontColor("green").setFontWeight("bold");
+        
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var tokenSheet = ss.getSheetByName("Tokens");
+        
+        if (!tokenSheet || tokenSheet.getLastRow() < 2) {
+          countTrackingCell.setValue(0);
+          return;
+        }
+        
+        var registeredData = tokenSheet.getRange(2, 1, tokenSheet.getLastRow() - 1, 3).getValues();
+        var targetedTokens = [];
+        
+        for (var j = 0; j < registeredData.length; j++) {
+          var userToken = registeredData[j][1];
+          var isActive = registeredData[j][2];
+          
+          if (userToken && (isActive === true || String(isActive).toUpperCase() === "TRUE")) {
+            if (targetedTokens.indexOf(userToken) === -1) {
+              targetedTokens.push(userToken);
+            }
+          }
+        }
+        
+        countTrackingCell.setValue(targetedTokens.length);
+        
+        var eventTitle = sheet.getRange(editedRow, 2).getValue();
+        
+        // Dispatches messaging requests using the legacy FCM HTTP API, which works reliably with Apps Script and the existing server key.
+        for (var i = 0; i < targetedTokens.length; i++) {
+          var payload = {
+            "to": targetedTokens[i],
+            "notification": {
+              "title": "🏀 New Match Invite: " + eventTitle,
+              "body": "Tap here to open your RSVP dashboard!"
+            },
+            "data": {
+              "url": "https://sziror.github.io/basketcount/"
+            }
+          };
+          
+          var options = {
+            "method": "post",
+            "contentType": "application/json",
+            "headers": {
+              "Authorization": "key=AIzaSyCYY1wMsyEkwXFlbIx0jzfRA5ayDTnTqqY"
+            },
+            "payload": JSON.stringify(payload),
+            "muteHttpExceptions": true
+          };
+          
+          UrlFetchApp.fetch("https://fcm.googleapis.com/fcm/send", options);
+        }
+      }
+    } else {
+      range.setFontColor("black");
+      timestampCell.setValue("Modified: " + formattedDate).setFontColor("#555555").setFontWeight("normal");
+    }
+  }
+}
