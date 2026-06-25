@@ -130,15 +130,13 @@ async function requestNotificationPermission() {
         if (permission === 'granted') {
             console.log('Notification permission granted.');
             
-            const registration = await navigator.serviceWorker.ready;
+            // By using the default filename, Firebase handles the service worker automatically!
             const currentToken = await messaging.getToken({
-                serviceWorkerRegistration: registration, 
                 vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY' 
             });
             
             if (currentToken) {
                 console.log("Device Token Generated: ", currentToken);
-                // Next step will be storing this token in the basketcount-kozgaz spreadsheet
             }
         } else {
             console.warn('Permission denied for notifications.');
