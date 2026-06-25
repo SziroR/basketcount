@@ -107,6 +107,7 @@
         <div id="statusMessage" class="status-msg"></div>
     </div>
 
+    <!-- Firebase SDK Links -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     
@@ -123,7 +124,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
-        let globalDeviceToken = ""; // Store globally to pair with RSVP actions
+        let globalDeviceToken = ""; // Stores token to bind to RSVP actions dynamically
 
         // Request notification access on startup and log token
         async function requestNotificationPermission() {
@@ -137,6 +138,7 @@
                     });
 
                     await navigator.serviceWorker.ready;
+                    console.log('Service Worker is fully active and ready.');
 
                     const currentToken = await messaging.getToken({
                         serviceWorkerRegistration: registration,
@@ -150,10 +152,12 @@
                         // Grab saved name if available to tie it to the token right away
                         const savedName = localStorage.getItem('savedPlayerName') || "Unknown Device";
                         
-                        // Register token initially
+                        // Send text/plain context block to bypass CORS restriction filters
                         await fetch(WEB_APP_URL, {
                             method: 'POST',
-                            mode: 'no-cors',
+                            headers: {
+                                'Content-Type': 'text/plain;charset=utf-8'
+                            },
                             body: JSON.stringify({
                                 key: SECURITY_KEY,
                                 action: "save_token",
@@ -161,6 +165,7 @@
                                 name: savedName
                             })
                         });
+                        console.log("Token logged into Google Spreadsheet backend.");
                     }
                 } else {
                     console.warn('Permission denied for notifications.');
@@ -224,13 +229,15 @@
                 event: currentEventTitle,
                 name: nameInput,
                 status: rsvpStatus,
-                token: globalDeviceToken // Bundling the token dynamically into the RSVP row link
+                token: globalDeviceToken
             };
 
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8'
+                    },
                     body: JSON.stringify(payload)
                 });
 
