@@ -107,7 +107,6 @@
         <div id="statusMessage" class="status-msg"></div>
     </div>
 
-    <!-- Firebase SDK Links -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     
@@ -124,9 +123,10 @@
 
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
-        let globalDeviceToken = ""; // Stores token to bind to RSVP actions dynamically
+        
+        // --- THIS IS THE VARIABLE SAVING THE TOKEN ON THE DEVICE ---
+        let deviceTokenVariable = ""; 
 
-        // Request notification access on startup and log token
         async function requestNotificationPermission() {
             try {
                 const permission = await Notification.requestPermission();
@@ -138,40 +138,22 @@
                     });
 
                     await navigator.serviceWorker.ready;
-                    console.log('Service Worker is fully active and ready.');
-
+                    
                     const currentToken = await messaging.getToken({
                         serviceWorkerRegistration: registration,
                         vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY'
                     });
                     
                     if (currentToken) {
-                        globalDeviceToken = currentToken;
-                        console.log("Device Token Acquired.");
-                        
-                        // Grab saved name if available to tie it to the token right away
-                        const savedName = localStorage.getItem('savedPlayerName') || "Unknown Device";
-                        
-                        // Send text/plain context block to bypass CORS restriction filters
-                        await fetch(WEB_APP_URL, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'text/plain;charset=utf-8'
-                            },
-                            body: JSON.stringify({
-                                key: SECURITY_KEY,
-                                action: "save_token",
-                                token: currentToken,
-                                name: savedName
-                            })
-                        });
-                        console.log("Token logged into Google Spreadsheet backend.");
+                        // Save token strictly to our local variable
+                        deviceTokenVariable = currentToken;
+                        console.log("Token successfully stored in local variable.");
                     }
                 } else {
                     console.warn('Permission denied for notifications.');
                 }
             } catch (err) {
-                console.error('An error occurred while retrieving token. ', err);
+                console.error('Notification setup skipped or errored: ', err);
             }
         }
 
@@ -224,20 +206,19 @@
             statusDiv.style.color = "var(--orange)";
             statusDiv.innerText = "Sending RSVP...";
 
+            // Keep secret key and payloads out of URLs completely
             const payload = {
                 key: SECURITY_KEY,
                 event: currentEventTitle,
                 name: nameInput,
                 status: rsvpStatus,
-                token: globalDeviceToken
+                token: deviceTokenVariable // Passing the token variable along here
             };
 
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'text/plain;charset=utf-8'
-                    },
+                    mode: 'no-cors', 
                     body: JSON.stringify(payload)
                 });
 
