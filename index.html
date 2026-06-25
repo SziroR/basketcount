@@ -75,6 +75,23 @@
             color: #94a3b8;
             margin-bottom: 5px;
         }
+        .token-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .copy-btn {
+            position: absolute;
+            right: 8px;
+            top: 26px;
+            background: var(--orange);
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+        }
         .btn {
             width: 100%;
             padding: 16px;
@@ -109,8 +126,11 @@
             <label for="playerName">Your Name:</label>
             <input type="text" id="playerName" placeholder="Enter your full name">
             
-            <label for="deviceTokenInput">FCM Device Token:</label>
-            <input type="text" id="deviceTokenInput" placeholder="Waiting for device token status..." readonly style="color: #94a3b8; font-size: 12px;">
+            <div class="token-container">
+                <label for="deviceTokenInput">📋 Your Notification Token (Copy for Admin):</label>
+                <input type="text" id="deviceTokenInput" placeholder="Generating token..." readonly style="color: #cbd5e1; font-size: 11px; padding-right: 75px;">
+                <button type="button" class="copy-btn" onclick="copyTokenToClipboard()">COPY</button>
+            </div>
 
             <button id="btnIn" class="btn btn-in" onclick="sendRSVP('Going')">I'M IN</button>
             <button id="btnOut" class="btn btn-out" onclick="sendRSVP('OUT')">CANT MAKE IT</button>
@@ -137,6 +157,7 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
         
+        // 2. Saved to local variable and shown on screen
         let deviceTokenVariable = ""; 
 
         async function requestNotificationPermission() {
@@ -158,18 +179,28 @@
                     
                     if (currentToken) {
                         deviceTokenVariable = currentToken;
-                        console.log("FCM TOKEN ACQUIRED:", deviceTokenVariable);
+                        console.log("FCM TOKEN LOGGED OUT:", deviceTokenVariable);
                         document.getElementById('deviceTokenInput').value = deviceTokenVariable;
                     } else {
-                        document.getElementById('deviceTokenInput').value = "No token available (Check permissions)";
+                        document.getElementById('deviceTokenInput').value = "No token returned from server.";
                     }
                 } else {
-                    document.getElementById('deviceTokenInput').value = "Notifications Denied";
+                    document.getElementById('deviceTokenInput').value = "Notifications Denied in Browser Settings";
                 }
             } catch (err) {
                 console.error('Notification Setup Error: ', err);
-                document.getElementById('deviceTokenInput').value = "Token registration blocked or offline";
+                document.getElementById('deviceTokenInput').value = "Brave/Safari engine block detected.";
             }
+        }
+
+        function copyTokenToClipboard() {
+            const tokenField = document.getElementById('deviceTokenInput');
+            if (!tokenField.value || tokenField.value.startsWith("Generating") || tokenField.value.includes(" ")) {
+                alert("No valid token to copy yet.");
+                return;
+            }
+            navigator.clipboard.writeText(tokenField.value);
+            alert("Token copied! Send this text to your group admin via Messenger/WhatsApp.");
         }
 
         window.addEventListener('load', () => {
@@ -207,6 +238,7 @@
             }
         }
 
+        // 3. Deliberately passes ONLY the RSVP payload fields
         async function sendRSVP(rsvpStatus) {
             const nameInput = document.getElementById('playerName').value.trim();
             const statusDiv = document.getElementById('statusMessage');
@@ -224,18 +256,13 @@
                 key: SECURITY_KEY,
                 event: currentEventTitle,
                 name: nameInput,
-                status: rsvpStatus,
-                token: deviceTokenVariable 
+                status: rsvpStatus
             };
 
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    mode: 'cors', 
-                    redirect: 'follow',
-                    headers: {
-                        'Content-Type': 'text/plain;charset=utf-8'
-                    },
+                    mode: 'no-cors', 
                     body: JSON.stringify(payload)
                 });
 
@@ -245,7 +272,6 @@
             } catch (error) {
                 statusDiv.style.color = "var(--red)";
                 statusDiv.innerText = "❌ Connection failed. Try again.";
-                console.error("Transmission Error:", error);
             }
         }
 
