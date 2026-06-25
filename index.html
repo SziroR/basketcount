@@ -107,7 +107,53 @@
         <div id="statusMessage" class="status-msg"></div>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     <script>
+// Initialize Firebase Web Core for basketcount-kozgaz
+const firebaseConfig = {
+  apiKey: "AIzaSyCYY1wMsyEkwXFlbIx0jzfRA5ayDTnTqqY",
+  authDomain: "basketcount-kozgaz.firebaseapp.com",
+  projectId: "basketcount-kozgaz",
+  storageBucket: "basketcount-kozgaz.firebasestorage.app",
+  messagingSenderId: "464249124868",
+  appId: "1:464249124868:web:79b46b23180d1efc479d51"
+};
+
+firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging();
+
+// Request notification access on startup
+async function requestNotificationPermission() {
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            console.log('Notification permission granted.');
+            
+            // Get the token for this specific device
+            const currentToken = await messaging.getToken({ 
+                vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY' 
+            });
+            
+            if (currentToken) {
+                console.log("Device Token Generated: ", currentToken);
+                // Next step will be storing this token in the basketcount-kozgaz spreadsheet
+            }
+        } else {
+            console.warn('Permission denied for notifications.');
+        }
+    } catch (err) {
+        console.error('An error occurred while retrieving token. ', err);
+    }
+}
+
+// Call the function on layout load
+window.addEventListener('load', () => {
+    requestNotificationPermission();
+});
+
+
+
         // Paste your fresh deployed Google Apps Script URL here:
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
         const SECURITY_KEY = "talicskauborka"; 
