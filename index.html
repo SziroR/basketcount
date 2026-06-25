@@ -59,7 +59,7 @@
         input {
             width: 100%;
             padding: 14px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             border: 2px solid #334155;
             background: #1e293b;
             color: white;
@@ -68,6 +68,13 @@
             box-sizing: border-box;
         }
         input:focus { border-color: var(--orange); outline: none; }
+        label {
+            display: block;
+            text-align: left;
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
         .btn {
             width: 100%;
             padding: 16px;
@@ -99,7 +106,12 @@
         </div>
 
         <div id="actionArea">
+            <label for="playerName">Your Name:</label>
             <input type="text" id="playerName" placeholder="Enter your full name">
+            
+            <label for="deviceTokenInput">FCM Device Token:</label>
+            <input type="text" id="deviceTokenInput" placeholder="Waiting for device token status..." readonly style="color: #94a3b8; font-size: 12px;">
+
             <button id="btnIn" class="btn btn-in" onclick="sendRSVP('Going')">I'M IN</button>
             <button id="btnOut" class="btn btn-out" onclick="sendRSVP('OUT')">CANT MAKE IT</button>
         </div>
@@ -124,7 +136,7 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
         
-        // This local variable captures and holds the FCM push token securely
+        // 2. Local variable saving the token
         let deviceTokenVariable = ""; 
 
         async function requestNotificationPermission() {
@@ -146,13 +158,19 @@
                     
                     if (currentToken) {
                         deviceTokenVariable = currentToken;
-                        console.log("Token successfully stored in local variable.");
+                        
+                        // 2 & 3. Put it out to console and paste into the new form input field
+                        console.log("FCM TOKEN ACQUIRED:", deviceTokenVariable);
+                        document.getElementById('deviceTokenInput').value = deviceTokenVariable;
+                    } else {
+                        document.getElementById('deviceTokenInput').value = "No token available (Check permissions)";
                     }
                 } else {
-                    console.warn('Permission denied for notifications.');
+                    document.getElementById('deviceTokenInput').value = "Notifications Denied";
                 }
             } catch (err) {
-                console.error('Notification registration error: ', err);
+                console.error('Notification Setup Error: ', err);
+                document.getElementById('deviceTokenInput').value = "Token registration blocked or offline";
             }
         }
 
@@ -160,7 +178,7 @@
             requestNotificationPermission();
         });
 
-        // Core BasketCount Routing Addresses
+        // Core App Routing Addresses
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
         const SECURITY_KEY = "talicskauborka"; 
         let currentEventTitle = ""; 
@@ -192,6 +210,7 @@
             }
         }
 
+        // 4. Send normally via simple JSON body request
         async function sendRSVP(rsvpStatus) {
             const nameInput = document.getElementById('playerName').value.trim();
             const statusDiv = document.getElementById('statusMessage');
@@ -205,22 +224,19 @@
             statusDiv.style.color = "var(--orange)";
             statusDiv.innerText = "Sending RSVP...";
 
-            // Pack fields as Form URL parameters so they pass cleanly through browser network layers
-            const formBody = new URLSearchParams();
-            formBody.append("key", SECURITY_KEY);
-            formBody.append("event", currentEventTitle);
-            formBody.append("name", nameInput);
-            formBody.append("status", rsvpStatus);
-            formBody.append("token", deviceTokenVariable);
+            const payload = {
+                key: SECURITY_KEY,
+                event: currentEventTitle,
+                name: nameInput,
+                status: rsvpStatus,
+                token: deviceTokenVariable 
+            };
 
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
                     mode: 'no-cors', 
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-                    },
-                    body: formBody
+                    body: JSON.stringify(payload)
                 });
 
                 statusDiv.style.color = "var(--green)";
