@@ -124,17 +124,23 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
 
-        // Request notification access on startup and log token
+ // Request notification access on startup and log token
         async function requestNotificationPermission() {
             try {
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
                     console.log('Notification permission granted.');
                     
-                    // Scoped configuration specifically for the /basketcount/ folder architecture
+                    // 1. Manually register your file using an absolute folder path relative to the domain
+                    const registration = await navigator.serviceWorker.register('/basketcount/firebase-messaging-sw.js', { 
+                        scope: '/basketcount/' 
+                    });
+                    console.log('Service Worker successfully bound to basketcount folder scope.');
+
+                    // 2. Pass this explicit, active registration layout directly to Firebase
                     const currentToken = await messaging.getToken({
-                        vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY',
-                        serviceWorkerRegistration: await navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: '/basketcount/' })
+                        serviceWorkerRegistration: registration,
+                        vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY'
                     });
                     
                     if (currentToken) {
@@ -153,7 +159,6 @@
         window.addEventListener('load', () => {
             requestNotificationPermission();
         });
-
         // -------------------------------------------------------------
         // Core BasketCount App Functionality
         // -------------------------------------------------------------
