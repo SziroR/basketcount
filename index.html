@@ -107,6 +107,7 @@
         <div id="statusMessage" class="status-msg"></div>
     </div>
 
+    <!-- Firebase SDK Links -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     
@@ -124,7 +125,7 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
 
- // Request notification access on startup and log token
+        // Request notification access on startup and log token
         async function requestNotificationPermission() {
             try {
                 const permission = await Notification.requestPermission();
@@ -137,7 +138,11 @@
                     });
                     console.log('Service Worker successfully bound to basketcount folder scope.');
 
-                    // 2. Pass this explicit, active registration layout directly to Firebase
+                    // 2. WAIT for the service worker to fully activate and clear the "AbortError" race condition
+                    await navigator.serviceWorker.ready;
+                    console.log('Service Worker is fully active and ready.');
+
+                    // 3. Pass this explicit, active registration layout directly to Firebase
                     const currentToken = await messaging.getToken({
                         serviceWorkerRegistration: registration,
                         vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY'
@@ -159,6 +164,7 @@
         window.addEventListener('load', () => {
             requestNotificationPermission();
         });
+
         // -------------------------------------------------------------
         // Core BasketCount App Functionality
         // -------------------------------------------------------------
