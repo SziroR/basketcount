@@ -124,7 +124,7 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
         
-        // --- THIS IS THE VARIABLE SAVING THE TOKEN ON THE DEVICE ---
+        // This local variable captures and holds the FCM push token securely
         let deviceTokenVariable = ""; 
 
         async function requestNotificationPermission() {
@@ -145,7 +145,6 @@
                     });
                     
                     if (currentToken) {
-                        // Save token strictly to our local variable
                         deviceTokenVariable = currentToken;
                         console.log("Token successfully stored in local variable.");
                     }
@@ -153,7 +152,7 @@
                     console.warn('Permission denied for notifications.');
                 }
             } catch (err) {
-                console.error('Notification setup skipped or errored: ', err);
+                console.error('Notification registration error: ', err);
             }
         }
 
@@ -161,7 +160,7 @@
             requestNotificationPermission();
         });
 
-        // Core BasketCount App Functionality
+        // Core BasketCount Routing Addresses
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
         const SECURITY_KEY = "talicskauborka"; 
         let currentEventTitle = ""; 
@@ -206,20 +205,22 @@
             statusDiv.style.color = "var(--orange)";
             statusDiv.innerText = "Sending RSVP...";
 
-            // Keep secret key and payloads out of URLs completely
-            const payload = {
-                key: SECURITY_KEY,
-                event: currentEventTitle,
-                name: nameInput,
-                status: rsvpStatus,
-                token: deviceTokenVariable // Passing the token variable along here
-            };
+            // Pack fields as Form URL parameters so they pass cleanly through browser network layers
+            const formBody = new URLSearchParams();
+            formBody.append("key", SECURITY_KEY);
+            formBody.append("event", currentEventTitle);
+            formBody.append("name", nameInput);
+            formBody.append("status", rsvpStatus);
+            formBody.append("token", deviceTokenVariable);
 
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
                     mode: 'no-cors', 
-                    body: JSON.stringify(payload)
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                    },
+                    body: formBody
                 });
 
                 statusDiv.style.color = "var(--green)";
