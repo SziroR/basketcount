@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tüker-Közgáz Team RSVP</title>
+    <title>BasketCount Közgáz Team RSVP</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -89,7 +89,7 @@
 <body>
 
     <div class="card">
-        <h1>🏀 Hoops RSVP</h1>
+        <h1>🏀 BasketCount</h1>
         
         <div class="event-details">
             <h2 id="eventDisplay">Loading event...</h2>
@@ -109,51 +109,54 @@
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+    
     <script>
-// Initialize Firebase Web Core for basketcount-kozgaz
-const firebaseConfig = {
-  apiKey: "AIzaSyCYY1wMsyEkwXFlbIx0jzfRA5ayDTnTqqY",
-  authDomain: "basketcount-kozgaz.firebaseapp.com",
-  projectId: "basketcount-kozgaz",
-  storageBucket: "basketcount-kozgaz.firebasestorage.app",
-  messagingSenderId: "464249124868",
-  appId: "1:464249124868:web:79b46b23180d1efc479d51"
-};
+        // Initialize Firebase Core for basketcount-kozgaz
+        const firebaseConfig = {
+          apiKey: "AIzaSyCYY1wMsyEkwXFlbIx0jzfRA5ayDTnTqqY",
+          authDomain: "basketcount-kozgaz.firebaseapp.com",
+          projectId: "basketcount-kozgaz",
+          storageBucket: "basketcount-kozgaz.firebasestorage.app",
+          messagingSenderId: "464249124868",
+          appId: "1:464249124868:web:79b46b23180d1efc479d51"
+        };
 
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
+        firebase.initializeApp(firebaseConfig);
+        const messaging = firebase.messaging();
 
-// Request notification access on startup
-async function requestNotificationPermission() {
-    try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            console.log('Notification permission granted.');
-            
-            // By using the default filename, Firebase handles the service worker automatically!
-            const currentToken = await messaging.getToken({
-                vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY' 
-            });
-            
-            if (currentToken) {
-                console.log("Device Token Generated: ", currentToken);
+        // Request notification access on startup and log token
+        async function requestNotificationPermission() {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    console.log('Notification permission granted.');
+                    
+                    // Scoped configuration specifically for the /basketcount/ folder architecture
+                    const currentToken = await messaging.getToken({
+                        vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY',
+                        serviceWorkerRegistration: await navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: '/basketcount/' })
+                    });
+                    
+                    if (currentToken) {
+                        console.log("Device Token Generated: ", currentToken);
+                        alert("Token: " + currentToken); // Copy directly from this popup!
+                    }
+                } else {
+                    console.warn('Permission denied for notifications.');
+                }
+            } catch (err) {
+                console.error('An error occurred while retrieving token. ', err);
             }
-        } else {
-            console.warn('Permission denied for notifications.');
         }
-    } catch (err) {
-        console.error('An error occurred while retrieving token. ', err);
-    }
-}
 
-// Call the function on layout load
-window.addEventListener('load', () => {
-    requestNotificationPermission();
-});
+        // Trigger configuration load on launch
+        window.addEventListener('load', () => {
+            requestNotificationPermission();
+        });
 
-
-
-        // Paste your fresh deployed Google Apps Script URL here:
+        // -------------------------------------------------------------
+        // Core BasketCount App Functionality
+        // -------------------------------------------------------------
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
         const SECURITY_KEY = "talicskauborka"; 
         let currentEventTitle = ""; 
@@ -167,7 +170,6 @@ window.addEventListener('load', () => {
                 document.getElementById('eventDisplay').innerText = eventData.title;
                 
                 if (eventData.title === "No Active Invites") {
-                    // Hide entry inputs if there is nothing currently running
                     document.getElementById('actionArea').style.display = "none";
                     return;
                 }
