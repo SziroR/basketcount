@@ -107,7 +107,6 @@
         <div id="statusMessage" class="status-msg"></div>
     </div>
 
-    <!-- Firebase SDK Links -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     
@@ -124,6 +123,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
+        let globalDeviceToken = ""; // Store globally to pair with RSVP actions
 
         // Request notification access on startup and log token
         async function requestNotificationPermission() {
@@ -132,25 +132,35 @@
                 if (permission === 'granted') {
                     console.log('Notification permission granted.');
                     
-                    // 1. Manually register your file using an absolute folder path relative to the domain
                     const registration = await navigator.serviceWorker.register('/basketcount/firebase-messaging-sw.js', { 
                         scope: '/basketcount/' 
                     });
-                    console.log('Service Worker successfully bound to basketcount folder scope.');
 
-                    // 2. WAIT for the service worker to fully activate and clear the "AbortError" race condition
                     await navigator.serviceWorker.ready;
-                    console.log('Service Worker is fully active and ready.');
 
-                    // 3. Pass this explicit, active registration layout directly to Firebase
                     const currentToken = await messaging.getToken({
                         serviceWorkerRegistration: registration,
                         vapidKey: 'BPXDp_PvudyJI5UkYHPNqSztU-5t7l_MDICa2AZt9VDsI5NcXZuLRKGBFGK3_Bc2jE-rPoNyLtthbg5JHr3fgVY'
                     });
                     
                     if (currentToken) {
-                        console.log("Device Token Generated: ", currentToken);
-                        alert("Token: " + currentToken); // Copy directly from this popup!
+                        globalDeviceToken = currentToken;
+                        console.log("Device Token Acquired.");
+                        
+                        // Grab saved name if available to tie it to the token right away
+                        const savedName = localStorage.getItem('savedPlayerName') || "Unknown Device";
+                        
+                        // Register token initially
+                        await fetch(WEB_APP_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            body: JSON.stringify({
+                                key: SECURITY_KEY,
+                                action: "save_token",
+                                token: currentToken,
+                                name: savedName
+                            })
+                        });
                     }
                 } else {
                     console.warn('Permission denied for notifications.');
@@ -160,14 +170,11 @@
             }
         }
 
-        // Trigger configuration load on launch
         window.addEventListener('load', () => {
             requestNotificationPermission();
         });
 
-        // -------------------------------------------------------------
         // Core BasketCount App Functionality
-        // -------------------------------------------------------------
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
         const SECURITY_KEY = "talicskauborka"; 
         let currentEventTitle = ""; 
@@ -216,7 +223,8 @@
                 key: SECURITY_KEY,
                 event: currentEventTitle,
                 name: nameInput,
-                status: rsvpStatus
+                status: rsvpStatus,
+                token: globalDeviceToken // Bundling the token dynamically into the RSVP row link
             };
 
             try {
