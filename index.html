@@ -157,7 +157,6 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
         
-        // 2. Saved to local variable and shown on screen
         let deviceTokenVariable = ""; 
 
         async function requestNotificationPermission() {
@@ -238,7 +237,6 @@
             }
         }
 
-        // 3. Deliberately passes ONLY the RSVP payload fields
         async function sendRSVP(rsvpStatus) {
             const nameInput = document.getElementById('playerName').value.trim();
             const statusDiv = document.getElementById('statusMessage');
