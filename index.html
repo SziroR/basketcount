@@ -119,6 +119,7 @@
         <div id="statusMessage" class="status-msg"></div>
     </div>
 
+    <!-- Firebase SDK Links -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     
@@ -136,7 +137,6 @@
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
         
-        // 2. Local variable saving the token
         let deviceTokenVariable = ""; 
 
         async function requestNotificationPermission() {
@@ -158,8 +158,6 @@
                     
                     if (currentToken) {
                         deviceTokenVariable = currentToken;
-                        
-                        // 2 & 3. Put it out to console and paste into the new form input field
                         console.log("FCM TOKEN ACQUIRED:", deviceTokenVariable);
                         document.getElementById('deviceTokenInput').value = deviceTokenVariable;
                     } else {
@@ -178,7 +176,6 @@
             requestNotificationPermission();
         });
 
-        // Core App Routing Addresses
         const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
         const SECURITY_KEY = "talicskauborka"; 
         let currentEventTitle = ""; 
@@ -210,7 +207,6 @@
             }
         }
 
-        // 4. Send normally via simple JSON body request
         async function sendRSVP(rsvpStatus) {
             const nameInput = document.getElementById('playerName').value.trim();
             const statusDiv = document.getElementById('statusMessage');
@@ -235,7 +231,11 @@
             try {
                 await fetch(WEB_APP_URL, {
                     method: 'POST',
-                    mode: 'no-cors', 
+                    mode: 'cors', 
+                    redirect: 'follow',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8'
+                    },
                     body: JSON.stringify(payload)
                 });
 
@@ -245,6 +245,7 @@
             } catch (error) {
                 statusDiv.style.color = "var(--red)";
                 statusDiv.innerText = "❌ Connection failed. Try again.";
+                console.error("Transmission Error:", error);
             }
         }
 
