@@ -19,11 +19,12 @@ messaging.onBackgroundMessage((payload) => {
   console.log('Background Notification Received: ', payload);
   
   const notificationTitle = payload.notification.title;
+  const targetUrl = (payload.data && payload.data.url) || 'https://sziror.github.io/basketcount/index.html';
   const notificationOptions = {
     body: payload.notification.body,
     icon: '/icon.png', // path to your app icon
     badge: '/icon.png',
-    data: { url: 'https://sziror.github.io/basketcount/' } 
+    data: { url: targetUrl }
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
@@ -32,7 +33,10 @@ messaging.onBackgroundMessage((payload) => {
 // Handle notification tap to open the app directly
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const targetUrl = event.notification.data && event.notification.data.url
+    ? event.notification.data.url
+    : 'https://sziror.github.io/basketcount/index.html';
   event.waitUntil(
-    clients.openWindow(event.notification.data.url)
+    clients.openWindow(targetUrl)
   );
 });

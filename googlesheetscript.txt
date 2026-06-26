@@ -1,37 +1,216 @@
 // This is the script used for the google sheet backend
 // --- CONFIGURATION ---
-var SECRET_KEY = "talicskauborka"; 
+var SECRET_KEY = "talicskauborka";
+var NOTIFICATION_URL = "https://sziror.github.io/basketcount/index.html";
+var TEST_NOTIFICATION_TITLE = "Test notification";
+var TEST_NOTIFICATION_BODY = "This is a test message configured in Apps Script.";
+var FCM_PROJECT_ID = "basketcount-kozgaz";
 
-// RSVP POST PAYLOAD HANDLER
-function doPost(e) {
-  var data = JSON.parse(e.postData.contents);
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Notifications')
+    .addItem('Send test notification', 'sendNotificationNow')
+    .addItem('Announce selected event', 'announceSelectedEvent')
+    .addToUi();
+}
+
+function sendNotificationNow() {
+  return sendNotification(TEST_NOTIFICATION_TITLE, TEST_NOTIFICATION_BODY, NOTIFICATION_URL);
+}
+
+function announceSelectedEvent() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  if (!data.key || data.key !== SECRET_KEY) {
-    return ContentService.createTextOutput("Unauthorized");
+  var sheet = ss.getActiveSheet();
+
+  if (sheet.getName() !== 'Events') {
+    SpreadsheetApp.getUi().alert('Select a row in the Events sheet first.');
+    return;
   }
-  
-  var rsvpSheet = ss.getSheetByName("RSVPs"); 
-  
-  // Column A: Date | Column B: Event | Column C: Name | Column D: Status
+
+  var row = sheet.getActiveCell().getRow();
+  if (row < 2) {
+    SpreadsheetApp.getUi().alert('Select an event row, not the header.');
+    return;
+  }
+
+  var eventTitle = String(sheet.getRange(row, 2).getValue() || '').trim();
+  var eventTime = String(sheet.getRange(row, 3).getValue() || '').trim();
+  var eventLocation = String(sheet.getRange(row, 4).getValue() || '').trim();
+
+  var title = eventTitle ? 'Match invite: ' + eventTitle : 'New Match Invite';
+  var body = 'Tap here to open your RSVP dashboard!';
+
+  if (eventTime || eventLocation) {
+    body = (eventTime ? eventTime : 'TBD') + (eventLocation ? ' - ' + eventLocation : '');
+  }
+
+  var tokenSheet = ss.getSheetByName('Tokens');
+  var announcementCount = 0;
+  if (tokenSheet && tokenSheet.getLastRow() >= 2) {
+    var registeredData = tokenSheet.getRange(2, 1, tokenSheet.getLastRow() - 1, 3).getValues();
+    for (var i = 0; i < registeredData.length; i++) {
+      var userToken = registeredData[i][1];
+      var isActive = registeredData[i][2];
+      if (userToken && (isActive === true || String(isActive).toUpperCase() === 'TRUE')) {
+        announcementCount++;
+      }
+    }
+  }
+
+  var result = sendNotification(title, body, NOTIFICATION_URL);
+  var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm:ss');
+  sheet.getRange(row, 6).setValue('announced');
+  sheet.getRange(row, 7).setValue(timestamp);
+  sheet.getRange(row, 8).setValue(announcementCount);
+  SpreadsheetApp.flush();
+
+  return result;
+}
+
+function sendNotification(title, body, url) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tokenSheet = ss.getSheetByName('Tokens');
+
+  if (!tokenSheet || tokenSheet.getLastRow() < 2) {
+    return 'No subscribers found';
+  }
+
+  var registeredData = tokenSheet.getRange(2, 1, tokenSheet.getLastRow() - 1, 3).getValues();
+  var targetedTokens = [];
+
+  for (var i = 0; i < registeredData.length; i++) {
+    var userToken = registeredData[i][1];
+    var isActive = registeredData[i][2];
+
+    if (userToken && (isActive === true || String(isActive).toUpperCase() === 'TRUE')) {
+      if (targetedTokens.indexOf(userToken) === -1) {
+        targetedTokens.push(userToken);
+      }
+    }
+  }
+
+  if (targetedTokens.length === 0) {
+    return 'No subscribers found';
+  }
+
+  var sendResults = [];
+  for (var j = 0; j < targetedTokens.length; j++) {
+    var payload = {
+      message: {
+        token: targetedTokens[j],
+        notification: {
+          title: title,
+          body: body
+        },
+        data: {
+          url: url
+        },
+        webpush: {
+          fcm_options: {
+            link: url
+          }
+        }
+      }
+    };
+
+    var options = {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        Authorization: 'Bearer ' + ScriptApp.getOAuthToken()
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    try {
+      var endpoint = 'https://fcm.googleapis.com/v1/projects/' + FCM_PROJECT_ID + '/messages:send';
+      var response = UrlFetchApp.fetch(endpoint, options);
+      var responseCode = response.getResponseCode();
+      var responseBody = response.getContentText();
+      sendResults.push('Send ' + (j + 1) + ': ' + responseCode + ' - ' + responseBody);
+      Logger.log('Token: ' + targetedTokens[j]);
+      Logger.log('Request payload: ' + JSON.stringify(payload));
+      Logger.log('Response code: ' + responseCode);
+      Logger.log('Response body: ' + responseBody);
+    } catch (err) {
+      sendResults.push('Send ' + (j + 1) + ' failed: ' + err);
+      Logger.log('Send failed for token ' + targetedTokens[j] + ': ' + err);
+    }
+  }
+
+  Logger.log(sendResults.join(' | '));
+  return 'Sent to ' + targetedTokens.length + ' subscriber(s)';
+}
+
+function ensureTokenSheet(ss) {
+  var tokenSheet = ss.getSheetByName('Tokens');
+  if (!tokenSheet) {
+    tokenSheet = ss.insertSheet('Tokens');
+    tokenSheet.appendRow(['Timestamp', 'Token', 'Active']);
+  }
+  return tokenSheet;
+}
+
+function saveTokenToSheet(token) {
+  if (!token) {
+    return 'No token provided';
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tokenSheet = ensureTokenSheet(ss);
+  var rows = tokenSheet.getDataRange().getDisplayValues();
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][1]).trim() === String(token).trim()) {
+      tokenSheet.getRange(i + 1, 1).setValue(new Date());
+      tokenSheet.getRange(i + 1, 3).setValue(true);
+      return 'Token updated';
+    }
+  }
+
+  tokenSheet.appendRow([new Date(), token, true]);
+  return 'Token stored';
+}
+
+function doPost(e) {
+  var rawData = e && e.postData && e.postData.contents ? e.postData.contents : '{}';
+  var data = JSON.parse(rawData);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  if (!data.key || data.key !== SECRET_KEY) {
+    return ContentService.createTextOutput('Unauthorized');
+  }
+
+  if (data.action === 'registerToken' && data.token) {
+    saveTokenToSheet(data.token);
+    return ContentService.createTextOutput('Token collected');
+  }
+
+  var rsvpSheet = ss.getSheetByName('RSVPs');
+  if (!rsvpSheet) {
+    rsvpSheet = ss.insertSheet('RSVPs');
+  }
+
   rsvpSheet.appendRow([
-    new Date(), 
-    data.event, 
-    data.name, 
+    new Date(),
+    data.event,
+    data.name,
     data.status
   ]);
 
-  return ContentService.createTextOutput("RSVP Success");
+  return ContentService.createTextOutput('RSVP Success');
 }
 
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var eventSheet = ss.getSheetByName("Events");
+  var eventSheet = ss.getSheetByName('Events');
   var data = eventSheet.getDataRange().getValues();
-  
+
   var activeEvent = null;
   for (var i = 1; i < data.length; i++) {
-    if (data[i][5] === "invite sent") { 
+    var statusValue = String(data[i][5] || '').trim().toLowerCase();
+    if (statusValue === 'announced') {
       activeEvent = {
         id: data[i][0],
         title: data[i][1],
@@ -39,103 +218,14 @@ function doGet(e) {
         location: data[i][3],
         mapsLink: data[i][4]
       };
-      break; 
+      break;
     }
   }
-  
-  if (!activeEvent) {
-    activeEvent = { title: "No Active Invites", time: "", location: "", mapsLink: "" };
-  }
-  
-  return ContentService.createTextOutput(JSON.stringify(activeEvent))
-                        .setMimeType(ContentService.MimeType.JSON);
-}
 
-// AUTOMATION STATE MACHINE + MODERN HTTP v1 PUSH BROADCASTER
-function onEdit(e) {
-  var range = e.range;
-  var sheet = range.getSheet();
-  
-  if (sheet.getName() === "Events" && range.getColumn() === 6) {
-    var editedRow = range.getRow();
-    var statusValue = range.getValue();
-    if (editedRow === 1) return; 
-    
-    var timestampCell = sheet.getRange(editedRow, 7); 
-    var countTrackingCell = sheet.getRange(editedRow, 8); 
-    var formattedDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
-    
-    if (statusValue === "announce it now") {
-      var allData = sheet.getDataRange().getValues();
-      var activeInviteCount = 0;
-      
-      for (var i = 1; i < allData.length; i++) {
-        if (allData[i][5] === "invite sent") activeInviteCount++;
-      }
-      
-      if (activeInviteCount > 0) {
-        range.setValue("error in invite sending").setFontColor("red");
-        timestampCell.setValue("⚠️ Failed at " + formattedDate + " - Close out active 'invite sent' event first!").setFontColor("red").setFontWeight("bold");
-        countTrackingCell.setValue(0);
-      } else {
-        range.setValue("invite sent").setFontColor("green");
-        timestampCell.setValue("Sent on: " + formattedDate).setFontColor("green").setFontWeight("bold");
-        
-        var ss = SpreadsheetApp.getActiveSpreadsheet();
-        var tokenSheet = ss.getSheetByName("Tokens");
-        
-        if (!tokenSheet || tokenSheet.getLastRow() < 2) {
-          countTrackingCell.setValue(0);
-          return;
-        }
-        
-        var registeredData = tokenSheet.getRange(2, 1, tokenSheet.getLastRow() - 1, 3).getValues();
-        var targetedTokens = [];
-        
-        for (var j = 0; j < registeredData.length; j++) {
-          var userToken = registeredData[j][1];
-          var isActive = registeredData[j][2];
-          
-          if (userToken && (isActive === true || String(isActive).toUpperCase() === "TRUE")) {
-            if (targetedTokens.indexOf(userToken) === -1) {
-              targetedTokens.push(userToken);
-            }
-          }
-        }
-        
-        countTrackingCell.setValue(targetedTokens.length);
-        
-        var eventTitle = sheet.getRange(editedRow, 2).getValue();
-        
-        // Dispatches messaging requests using the legacy FCM HTTP API, which works reliably with Apps Script and the existing server key.
-        for (var i = 0; i < targetedTokens.length; i++) {
-          var payload = {
-            "to": targetedTokens[i],
-            "notification": {
-              "title": "🏀 New Match Invite: " + eventTitle,
-              "body": "Tap here to open your RSVP dashboard!"
-            },
-            "data": {
-              "url": "https://sziror.github.io/basketcount/"
-            }
-          };
-          
-          var options = {
-            "method": "post",
-            "contentType": "application/json",
-            "headers": {
-              "Authorization": "key=AIzaSyCYY1wMsyEkwXFlbIx0jzfRA5ayDTnTqqY"
-            },
-            "payload": JSON.stringify(payload),
-            "muteHttpExceptions": true
-          };
-          
-          UrlFetchApp.fetch("https://fcm.googleapis.com/fcm/send", options);
-        }
-      }
-    } else {
-      range.setFontColor("black");
-      timestampCell.setValue("Modified: " + formattedDate).setFontColor("#555555").setFontWeight("normal");
-    }
+  if (!activeEvent) {
+    activeEvent = { title: 'No Active Invites', time: '', location: '', mapsLink: '' };
   }
+
+  return ContentService.createTextOutput(JSON.stringify(activeEvent))
+    .setMimeType(ContentService.MimeType.JSON);
 }

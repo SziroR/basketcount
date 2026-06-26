@@ -178,6 +178,7 @@
                         deviceTokenVariable = currentToken;
                         console.log("FCM TOKEN LOGGED OUT:", deviceTokenVariable);
                         document.getElementById('deviceTokenInput').value = deviceTokenVariable;
+                        await registerDeviceToken(deviceTokenVariable);
                     } else {
                         document.getElementById('deviceTokenInput').value = "No token returned from server.";
                     }
@@ -187,6 +188,23 @@
             } catch (err) {
                 console.error('Notification Setup Error: ', err);
                 document.getElementById('deviceTokenInput').value = "Brave/Safari engine block detected.";
+            }
+        }
+
+        async function registerDeviceToken(token) {
+            if (!token) return;
+            try {
+                await fetch(WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({
+                        key: SECURITY_KEY,
+                        action: 'registerToken',
+                        token: token
+                    })
+                });
+            } catch (error) {
+                console.error('Token registration failed:', error);
             }
         }
 
@@ -250,9 +268,11 @@
 
             const payload = {
                 key: SECURITY_KEY,
+                action: 'rsvp',
                 event: currentEventTitle,
                 name: nameInput,
-                status: rsvpStatus
+                status: rsvpStatus,
+                token: deviceTokenVariable
             };
 
             try {
