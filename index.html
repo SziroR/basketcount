@@ -156,6 +156,9 @@
         const messaging = firebase.messaging();
         
         let deviceTokenVariable = ""; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
+        const SECURITY_KEY = "talicskauborka"; 
+        let currentEventTitle = ""; 
 
         async function requestNotificationPermission() {
             try {
@@ -187,7 +190,7 @@
                 }
             } catch (err) {
                 console.error('Notification Setup Error: ', err);
-                document.getElementById('deviceTokenInput').value = "Brave/Safari engine block detected.";
+                document.getElementById('deviceTokenInput').value = "Token registration blocked or offline";
             }
         }
 
@@ -218,14 +221,6 @@
             alert("Token copied! Send this text to your group admin via Messenger/WhatsApp.");
         }
 
-        window.addEventListener('load', () => {
-            requestNotificationPermission();
-        });
-
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
-        const SECURITY_KEY = "talicskauborka"; 
-        let currentEventTitle = ""; 
-
         async function fetchActiveEvent() {
             try {
                 const response = await fetch(WEB_APP_URL);
@@ -239,13 +234,18 @@
                     return;
                 }
                 
+                document.getElementById('actionArea').style.display = "block";
                 if (eventData.time) {
                     document.getElementById('eventTime').innerText = "⏰ " + eventData.time;
                     document.getElementById('eventLocation').innerText = "🏢 " + eventData.location;
                     
                     const mapsLink = document.getElementById('eventMaps');
-                    mapsLink.href = eventData.mapsLink;
-                    mapsLink.style.display = "inline-block";
+                    if (eventData.mapsLink && eventData.mapsLink.startsWith("http")) {
+                        mapsLink.href = eventData.mapsLink;
+                        mapsLink.style.display = "inline-block";
+                    } else {
+                        mapsLink.style.display = "none";
+                    }
                 }
             } catch (error) {
                 document.getElementById('eventDisplay').innerText = "System offline. Try again later.";
@@ -293,6 +293,7 @@
 
         window.onload = () => {
             fetchActiveEvent();
+            requestNotificationPermission();
             const savedName = localStorage.getItem('savedPlayerName');
             if (savedName) document.getElementById('playerName').value = savedName;
         };

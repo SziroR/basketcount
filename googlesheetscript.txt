@@ -1,4 +1,3 @@
-// This is the script used for the google sheet backend
 // --- CONFIGURATION ---
 var SECRET_KEY = "talicskauborka";
 var NOTIFICATION_URL = "https://sziror.github.io/basketcount/index.html";
@@ -21,7 +20,6 @@ function sendNotificationNow() {
 function announceSelectedEvent() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
-
   if (sheet.getName() !== 'Events') {
     SpreadsheetApp.getUi().alert('Select a row in the Events sheet first.');
     return;
@@ -39,7 +37,6 @@ function announceSelectedEvent() {
 
   var title = eventTitle ? 'Match invite: ' + eventTitle : 'New Match Invite';
   var body = 'Tap here to open your RSVP dashboard!';
-
   if (eventTime || eventLocation) {
     body = (eventTime ? eventTime : 'TBD') + (eventLocation ? ' - ' + eventLocation : '');
   }
@@ -59,6 +56,8 @@ function announceSelectedEvent() {
 
   var result = sendNotification(title, body, NOTIFICATION_URL);
   var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm:ss');
+  
+  // Explicitly marks state as 'announced' in lower-case
   sheet.getRange(row, 6).setValue('announced');
   sheet.getRange(row, 7).setValue(timestamp);
   sheet.getRange(row, 8).setValue(announcementCount);
@@ -70,14 +69,12 @@ function announceSelectedEvent() {
 function sendNotification(title, body, url) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var tokenSheet = ss.getSheetByName('Tokens');
-
   if (!tokenSheet || tokenSheet.getLastRow() < 2) {
     return 'No subscribers found';
   }
 
   var registeredData = tokenSheet.getRange(2, 1, tokenSheet.getLastRow() - 1, 3).getValues();
   var targetedTokens = [];
-
   for (var i = 0; i < registeredData.length; i++) {
     var userToken = registeredData[i][1];
     var isActive = registeredData[i][2];
@@ -112,7 +109,6 @@ function sendNotification(title, body, url) {
         }
       }
     };
-
     var options = {
       method: 'post',
       contentType: 'application/json',
@@ -122,7 +118,6 @@ function sendNotification(title, body, url) {
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
     };
-
     try {
       var endpoint = 'https://fcm.googleapis.com/v1/projects/' + FCM_PROJECT_ID + '/messages:send';
       var response = UrlFetchApp.fetch(endpoint, options);
@@ -198,34 +193,49 @@ function doPost(e) {
     data.name,
     data.status
   ]);
-
   return ContentService.createTextOutput('RSVP Success');
 }
 
+// RESTORED + FIX: Safely serializes text variations out to the client engine
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var eventSheet = ss.getSheetByName('Events');
+  var eventSheet = ss.getSheetByName("Events");
+  
+  if (!eventSheet) {
+    return ContentService.createTextOutput(JSON.stringify({ title: "No Active Invites", time: "", location: "", mapsLink: "" }))
+                          .setMimeType(ContentService.MimeType.JSON);
+  }
+  
   var data = eventSheet.getDataRange().getValues();
-
   var activeEvent = null;
+
   for (var i = 1; i < data.length; i++) {
-    var statusValue = String(data[i][5] || '').trim().toLowerCase();
-    if (statusValue === 'announced') {
+    var rawStatus = String(data[i][5] || '').trim().toLowerCase();
+    if (rawStatus === 'announced') {
+      
+      // Explicit string conversions guard against underlying complex object breaks
+      var timeString = "";
+      if (data[i][2] instanceof Date) {
+        timeString = Utilities.formatDate(data[i][2], Session.getScriptTimeZone(), "yyyy.MM.dd. HH:mm");
+      } else {
+        timeString = String(data[i][2] || '').trim();
+      }
+
       activeEvent = {
-        id: data[i][0],
-        title: data[i][1],
-        time: data[i][2],
-        location: data[i][3],
-        mapsLink: data[i][4]
+        id: String(data[i][0] || ''),
+        title: String(data[i][1] || ''),
+        time: timeString,
+        location: String(data[i][3] || ''),
+        mapsLink: String(data[i][4] || '')
       };
       break;
     }
   }
 
   if (!activeEvent) {
-    activeEvent = { title: 'No Active Invites', time: '', location: '', mapsLink: '' };
+    activeEvent = { title: "No Active Invites", time: "", location: "", mapsLink: "" };
   }
 
   return ContentService.createTextOutput(JSON.stringify(activeEvent))
-    .setMimeType(ContentService.MimeType.JSON);
+                        .setMimeType(ContentService.MimeType.JSON);
 }
