@@ -57,7 +57,6 @@ function announceSelectedEvent() {
   var result = sendNotification(title, body, NOTIFICATION_URL);
   var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm:ss');
   
-  // Explicitly marks state as 'announced' in lower-case
   sheet.getRange(row, 6).setValue('announced');
   sheet.getRange(row, 7).setValue(timestamp);
   sheet.getRange(row, 8).setValue(announcementCount);
@@ -196,24 +195,25 @@ function doPost(e) {
   return ContentService.createTextOutput('RSVP Success');
 }
 
-// RESTORED + FIX: Safely serializes text variations out to the client engine
+// RESTORED + UNIFIED: Finds the first matching row with any of the 3 active statuses
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var eventSheet = ss.getSheetByName("Events");
+  var eventSheet = ss.getSheetByName('Events');
   
   if (!eventSheet) {
-    return ContentService.createTextOutput(JSON.stringify({ title: "No Active Invites", time: "", location: "", mapsLink: "" }))
+    return ContentService.createTextOutput(JSON.stringify({ title: 'No Active Invites', time: '', location: '', mapsLink: '' }))
                           .setMimeType(ContentService.MimeType.JSON);
   }
-  
+
   var data = eventSheet.getDataRange().getValues();
   var activeEvent = null;
 
   for (var i = 1; i < data.length; i++) {
-    var rawStatus = String(data[i][5] || '').trim().toLowerCase();
-    if (rawStatus === 'announced') {
+    var statusValue = String(data[i][5] || '').trim().toLowerCase();
+    
+    // Unified check matches any of your 3 active states
+    if (statusValue === 'announced' || statusValue === 'error in invite sending' || statusValue === 'all rsvp in') {
       
-      // Explicit string conversions guard against underlying complex object breaks
       var timeString = "";
       if (data[i][2] instanceof Date) {
         timeString = Utilities.formatDate(data[i][2], Session.getScriptTimeZone(), "yyyy.MM.dd. HH:mm");
@@ -228,14 +228,14 @@ function doGet(e) {
         location: String(data[i][3] || ''),
         mapsLink: String(data[i][4] || '')
       };
-      break;
+      break; 
     }
   }
 
   if (!activeEvent) {
-    activeEvent = { title: "No Active Invites", time: "", location: "", mapsLink: "" };
+    activeEvent = { title: 'No Active Invites', time: '', location: '', mapsLink: '' };
   }
 
   return ContentService.createTextOutput(JSON.stringify(activeEvent))
-                        .setMimeType(ContentService.MimeType.JSON);
+    .setMimeType(ContentService.MimeType.JSON);
 }

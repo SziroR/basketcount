@@ -143,6 +143,12 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
     
     <script>
+        // CRITICAL CONFIG ARRAYS - Declared first to stop JavaScript breaks
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
+        const SECURITY_KEY = "talicskauborka"; 
+        let currentEventTitle = ""; 
+        let deviceTokenVariable = ""; 
+
         const firebaseConfig = {
           apiKey: "AIzaSyCYY1wMsyEkwXFlbIx0jzfRA5ayDTnTqqY",
           authDomain: "basketcount-kozgaz.firebaseapp.com",
@@ -154,11 +160,6 @@
 
         firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging();
-        
-        let deviceTokenVariable = ""; 
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxlIBYMrfmnuTptRrIEcTvfQ-3chF7vAmdKW4JzuHUQnHmb4sW8SyQBrkTXL8t1c-SKRg/exec"; 
-        const SECURITY_KEY = "talicskauborka"; 
-        let currentEventTitle = ""; 
 
         async function requestNotificationPermission() {
             try {
@@ -190,7 +191,7 @@
                 }
             } catch (err) {
                 console.error('Notification Setup Error: ', err);
-                document.getElementById('deviceTokenInput').value = "Token registration blocked or offline";
+                document.getElementById('deviceTokenInput').value = "Brave/Safari engine block detected.";
             }
         }
 
@@ -231,6 +232,9 @@
                 
                 if (eventData.title === "No Active Invites") {
                     document.getElementById('actionArea').style.display = "none";
+                    document.getElementById('eventTime').innerText = "";
+                    document.getElementById('eventLocation').innerText = "";
+                    document.getElementById('eventMaps').style.display = "none";
                     return;
                 }
                 
@@ -240,7 +244,7 @@
                     document.getElementById('eventLocation').innerText = "🏢 " + eventData.location;
                     
                     const mapsLink = document.getElementById('eventMaps');
-                    if (eventData.mapsLink && eventData.mapsLink.startsWith("http")) {
+                    if(eventData.mapsLink && eventData.mapsLink.startsWith("http")) {
                         mapsLink.href = eventData.mapsLink;
                         mapsLink.style.display = "inline-block";
                     } else {
